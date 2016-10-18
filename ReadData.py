@@ -9,15 +9,27 @@ Filename = 'NYPD_Motor_Vehicle_Collisions_1.csv';
 # set city
 City = 'nyc'
 ##############################
-#File format :
+# File format :
 # 0 Date
 # 1 Time
 # 4 Latitude
 # 5 Longitude
+# 10 Total Injury
+# 11 Total Killed
+# 12 Ped Injured
+# 13 Ped Killed
+# 14 Cyc Injured
+# 15 Cyc Killed
+# 16 Motorist Injured
+# 17 Motorist Killed
 ##############################
 
 lat_lon_box = dict();
 lat_lon_box['nyc'] = [40.917577, -74.25909, 40.477399, -73.70000]
+
+
+data_by_year = dict()
+
 
 
 class lat_long_validator:
@@ -79,7 +91,7 @@ with open(Filename, 'r') as csvfile:
     for row in rd:
         count += 1;
         #omit the 1st row
-        if(count == 1) :
+        if count == 1 :
             continue;
 
         # count till 10 records...TODO Remove!!!!
@@ -89,18 +101,36 @@ with open(Filename, 'r') as csvfile:
         #Validate year
         if not validate_year(row[0]):
             continue;
-
+        year = YEAR;
         time = row[1]
         lat = row[4]
         lon = row[5]
+
+        # check if empty
+        if not lat or not lon:
+            continue;
+        lat = float(row[4])
+        lon = float(row[5])
+
         if not loc_validator.validate(lat,lon):
             continue;
 
-        print (row[0]+" "+time+"  Lat :"+lat+" Long:"+lon)
+        death_or_injury = int(row[10]) + int(row[11]);
+        print (row[0]+" "+time+"  Lat :" + str(lat) + " Long:" + str(lon) + "  Death/Injury : "+ str(death_or_injury))
         row_count +=1
+        current = []
+        current.append(row[0])
+        current.append(time)
+        current.append(lat)
+        current.append(lon)
+        current.append(death_or_injury)
+        if year not in data_by_year or (data_by_year[year] is None):
+            data_by_year[year] = []
 
+        data_by_year[year].append(current)
 
 print(row_count)
+print(data_by_year)
 
 
 
