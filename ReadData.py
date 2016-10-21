@@ -2,8 +2,6 @@
 import csv
 
 ##############################
-# set year
-YEAR = 2016
 # set filename
 Filename = 'NYPD_Motor_Vehicle_Collisions_1.csv';
 # set city
@@ -77,10 +75,10 @@ class lat_long_validator:
         return True;
 
 
-def validate_year(date):
+def get_year(date):
     # format "mm/dd/yyyy"
     parts = date.split('/')
-    return int(parts[2]) == YEAR;
+    return int(parts[2]);
 
 
 loc_validator = lat_long_validator('nyc')
@@ -94,14 +92,7 @@ with open(Filename, 'r') as csvfile:
         if count == 1 :
             continue;
 
-        # count till 10 records...TODO Remove!!!!
-        if count > 10000 :
-            break;
-
-        #Validate year
-        if not validate_year(row[0]):
-            continue;
-        year = YEAR;
+        year = get_year(row[0]);
         time = row[1]
         lat = row[4]
         lon = row[5]
@@ -129,8 +120,22 @@ with open(Filename, 'r') as csvfile:
 
         data_by_year[year].append(current)
 
+
 print(row_count)
-print(data_by_year)
+for year in data_by_year.keys() :
+    year_list = data_by_year[year]
+    op_file= City + '_' + str(year)+'.csv'
+    f = open(op_file, 'w')
+    try:
+        for row in year_list :
+            content = [];
+
+            for z in row :
+                content.append(str(z))
+            f.write( ",".join(content)+"\n")
+    finally:
+        f.close()
+
 
 
 
