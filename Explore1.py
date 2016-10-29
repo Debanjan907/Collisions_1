@@ -8,6 +8,7 @@
 ############
 # TODO: Use bigfloat
 
+import scipy.stats
 import csv
 import math
 import numpy as np;
@@ -19,8 +20,33 @@ from sklearn.datasets.samples_generator import make_blobs
 from sklearn.preprocessing import StandardScaler
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.patches as mpatches
+import datetime
+from sklearn.neighbors.kde import KernelDensity
 
 
+##################################
+# General utility functions :Start
+##################################
+
+valid_years = [2012,2013,2014,2015,2016]
+
+def get_day_of_week(date_str) :
+    #date is in form dd/mm/yyyy
+    parts = date_str.split('/')
+    d = datetime.date(int(parts[2]), int(parts[0]), int(parts[1]))
+    return d.weekday()
+
+def get_city_bounds(city) :
+    lat_lon_box = dict();
+    #lower left corner - upper right corner
+    lat_lon_box['nyc'] = [ 40.477399, -74.25909, 40.917577,-73.70000]
+    return lat_lon_box[city];
+
+def get_mins(time_str) :
+    parts = time_str.split(':')
+    return (int(parts[0])*60)+(int(parts[1]));
+
+##################################
 
 class location:
     lat = 0;
@@ -178,8 +204,134 @@ def collisions_by_time_loc(city,year):
     ax.legend(handles=[city_patch, gran_patch, red_patch])
     plt.show()
 
-years = [2012,2013,2014,2015,2016]
+'''
 for y in years:
     collisons_by_time('nyc', y)
     collisions_by_time_loc('nyc',y);
+
+'''
+
+
+def week_time_buckets(granularity) :
+
+    length = ((24*60)/granularity)*7;
+    bucket = np.zeros(length)
+    return bucket;
+
+
+def coll_by_time_and_weekday ( city ,year) :
+    Filename = city + '_' + str(year) + '.csv';
+    granularity = 30
+
+    time_bucket_length = (24*60)/granularity;
+    bucket = np.ndarray(shape=[7,time_bucket_length],dtype=int)
+
+    with open(Filename, 'r') as csvfile:
+        rd = csv.reader(csvfile)
+        for row in rd:
+            weekday = get_day_of_week(row[0])
+            time = row[1]
+            time_parts = time.split(':');
+            hr = int(time_parts[0])
+            min = int(time_parts[1])
+            index = (hr * 60 + min) / granularity;
+            bucket[weekday][index]+=1
+
+    print bucket
+    return;
+
+def coll_by_loc_weekday(city,year) :
+    Filename = city + '_' + str(year) + '.csv';
+    #bucket the locations
+    bounds = get_city_bounds(city);
+    min_lat = bounds[0]
+    min_lon = bounds[1]
+    max_lat = bounds[2]
+    max_lon = bounds[3]
+
+    lat_diff = abs(max_lat - min_lat)
+    lon_diff = abs( max_lon - min_lon)
+    num_buckets = 100; #number of buckets for latitude and longitude
+    lat_step = lat_diff/num_buckets
+    lon_step = lon_diff/num_buckets
+
+    buckets = np.ndarray(shape=[7,2],dtype=list)
+    for i in range(7):
+        buckets[i][0] = []
+        buckets[i][1] = []
+    with open(Filename, 'r') as csvfile:
+        rd = csv.reader(csvfile)
+
+        for row in rd:
+            weekday = get_day_of_week(row[0])
+            lat = float(row[2])
+            lon = float(row[3])
+            lat_pos = float(int((lat - min_lat)/lat_step) * lat_step)+min_lat
+            lon_pos = float(int((lon - min_lon)/lon_step)*lon_step)+min_lon
+            buckets[weekday][0].append(lat_pos)
+            buckets[weekday][1].append(lon_pos)
+
+        print buckets;
+        for day in range(7):
+            l1 = len(buckets[day][1])
+            xy = np.ndarray(shape=[2,l1],dtype =float)
+            xy[0] = buckets[day][0]
+            xy[1] = buckets[day][1]
+            xy = np.vstack([xy[0], xy[1]])
+            z = scipy.stats.gaussian_kde(xy)(xy)
+            plt.scatter(xy[1], xy[0], c=z, s=100, edgecolor='')
+            plt.show()
+
+
+
+#coll_by_time_and_weekday('nyc',2014)
+#coll_by_loc_weekday('nyc',2015)
+
+def train_kde(city,year) :
+    Filename = city + '_' + str(year) + '.csv';
+    with open(Filename, 'r') as csvfile:
+        rd = csv.reader(csvfile)
+        d = []
+        count = 0
+        for row in rd:
+            weekday = get_day_of_week(row[0])
+            d.append(weekday)
+            #time = get_mins(row[1])
+            #d.append(time)
+            d.append(float(row[2]))
+            d.append(float(row[3]))
+            count +=1
+        data = np.reshape(d,newshape=[count,3])
+
+    print data;
+    kde = KernelDensity(kernel='gaussian').fit(data)
+    return kde
+kde = train_kde('nyc',2015);
+
+def run_kde(city,year ,kde) :
+    bounds = get_city_bounds(city)
+    min_lat = bounds[0]
+    max_lat = bounds[2]
+    min_lon = bounds[1]
+    max_lon = bounds[3]
+
+    lat,lat_step = np.linspace( min_lat, max_lat, 1000,retstep=True)
+    lon ,lon_step = np.linspace(min_lon, max_lon, 1000,retstep=True)
+    samples = np.ndarray(shape=[7,1000,1000])
+    for day in range(0,6,1):
+        for i in range(1000):
+            l1 = min_lat + lat_step * i;
+            for j in range(1000):
+                l2 = min_lon + lon_step * j
+                data = [day,i,j]
+                res =kde.score_samples(data)
+                print 'Result ' + str(res);
+                samples[day][i][j] = res;
+    print samples;
+    #res = kde.score_samples(data)
+    #print res
+
+run_kde('nyc',2014,kde)
+
+
 
